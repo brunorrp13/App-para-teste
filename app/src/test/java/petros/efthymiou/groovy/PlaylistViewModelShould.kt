@@ -6,6 +6,7 @@ import com.nhaarman.mockitokotlin2.verify
 import com.nhaarman.mockitokotlin2.whenever
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runBlockingTest
 import org.junit.Test
 
 import org.junit.Assert.*
@@ -13,6 +14,7 @@ import petros.efthymiou.groovy.playlist.Playlist
 import petros.efthymiou.groovy.playlist.PlaylistRepository
 import petros.efthymiou.groovy.playlist.PlaylistViewModel
 import petros.efthymiou.groovy.utils.BaseUnitTest
+import petros.efthymiou.groovy.utils.captureValues
 import petros.efthymiou.groovy.utils.getValueForTest
 
 class PlaylistViewModelShould: BaseUnitTest() {
@@ -22,17 +24,6 @@ class PlaylistViewModelShould: BaseUnitTest() {
     private val expected = Result.success(playlists)
     private val exception = RuntimeException("Something went wrong")
 
-    private fun mockSuccessfulCase(): PlaylistViewModel {
-        runBlocking {
-            whenever(repository.getPlaylists()).thenReturn(
-                flow {
-                    emit(expected)
-                }
-            )
-        }
-        val viewModel = PlaylistViewModel(repository)
-        return viewModel
-    }
 
     @Test
     fun getPlaylistsFromRepository(): Unit = runBlocking {
@@ -52,6 +43,13 @@ class PlaylistViewModelShould: BaseUnitTest() {
 
     @Test
     fun emitErrorWhenReceiveError() {
+        val viewModel = mockErrorCase()
+
+        assertEquals(exception, viewModel.playlists.getValueForTest()!!.exceptionOrNull())
+
+    }
+
+    private fun mockErrorCase(): PlaylistViewModel {
         runBlocking {
             whenever(repository.getPlaylists()).thenReturn(
                 flow {
@@ -60,10 +58,32 @@ class PlaylistViewModelShould: BaseUnitTest() {
             )
 
         }
-    val viewModel = PlaylistViewModel(repository)
-
-    assertEquals(exception, viewModel.playlists.getValueForTest()!!.exceptionOrNull())
-
+        val viewModel = PlaylistViewModel(repository)
+        return viewModel
     }
 
+    @Test
+    fun showSpinnerWhileLoading() = runBlockingTest {
+        val viewModel = mockSuccessfulCase()
+
+        viewModel.loader.captureValues {
+
+            viewModel.playlists.getValueForTest()
+
+            assertEquals(true, values[0])
+
+        }
+    }
+
+    private fun mockSuccessfulCase(): PlaylistViewModel {
+        runBlocking {
+            whenever(repository.getPlaylists()).thenReturn(
+                flow {
+                    emit(expected)
+                }
+            )
+        }
+        val viewModel = PlaylistViewModel(repository)
+        return viewModel
+    }
 }
